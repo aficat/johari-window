@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-100 dark:bg-gray-900">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Johari Window</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .grid-container {
+            display: grid;
+            gap: 1rem;
+            grid-template-columns: 1fr;
+        }
+        @media (min-width: 768px) {
+            .grid-container {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+        .pill {
+            cursor: grab;
+            user-select: none;
+            transition: transform 0.1s ease-in-out, box-shadow 0.1s ease-in-out;
+            font-size: 0.875rem;
+        }
+        .pill:active {
+            cursor: grabbing;
+        }
+        .drop-zone {
+            min-height: 10rem;
+            border-style: dashed;
+            border-width: 2px;
+            transition: background-color 0.2s;
+        }
+        .drop-zone.drag-over {
+            background-color: #d1d5db;
+        }
+    </style>
+</head>
+<body class="h-full antialiased text-gray-800 dark:text-gray-200">
+    <div id="app" class="p-4 md:p-8 flex flex-col items-center">
+        <header class="text-center mb-6">
+            <h1 class="text-3xl md:text-4xl font-bold text-blue-600 dark:text-blue-400">Personal Johari Window</h1>
+            <p class="mt-2 text-md text-gray-600 dark:text-gray-400">Drag and drop words into the four window panes to understand yourself better.</p>
+        </header>
+
+        <!-- Word Bank -->
+        <div id="word-bank-container" class="w-full max-w-4xl p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md mb-6">
+            <h2 class="text-lg font-semibold mb-3 text-center">Available Words</h2>
+            <div id="word-bank" class="flex flex-wrap gap-2 justify-center"></div>
+        </div>
+
+        <!-- Johari Window Grid -->
+        <div id="johari-window" class="grid-container w-full max-w-4xl">
+            <div id="known-known" class="drop-zone border-blue-400 bg-blue-50 dark:bg-blue-950 p-4 rounded-lg shadow-md" data-zone="known_known">
+                <h3 class="font-bold text-xl mb-2 text-blue-700 dark:text-blue-300">Open Area</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Known to self and known to others.</p>
+                <div class="flex flex-wrap gap-2"></div>
+            </div>
+            <div id="known-unknown" class="drop-zone border-red-400 bg-red-50 dark:bg-red-950 p-4 rounded-lg shadow-md" data-zone="known_unknown">
+                <h3 class="font-bold text-xl mb-2 text-red-700 dark:text-red-300">Blind Spot</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Not known to self but known to others.</p>
+                <div class="flex flex-wrap gap-2"></div>
+            </div>
+            <div id="unknown-known" class="drop-zone border-green-400 bg-green-50 dark:bg-green-950 p-4 rounded-lg shadow-md" data-zone="unknown_known">
+                <h3 class="font-bold text-xl mb-2 text-green-700 dark:text-green-300">Hidden Area</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Known to self but not known to others.</p>
+                <div class="flex flex-wrap gap-2"></div>
+            </div>
+            <div id="unknown-unknown" class="drop-zone border-gray-400 bg-gray-50 dark:bg-gray-800 p-4 rounded-lg shadow-md" data-zone="unknown_unknown">
+                <h3 class="font-bold text-xl mb-2 text-gray-700 dark:text-gray-300">Unknown Area</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Not known to self and not known to others.</p>
+                <div class="flex flex-wrap gap-2"></div>
+            </div>
+        </div>
+
+        <!-- Peer Input Section -->
+        <div id="peer-section" class="w-full max-w-4xl p-4 mt-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+            <h2 class="text-lg font-semibold mb-3 text-center">What My Peers Think</h2>
+            <p class="text-sm text-gray-600 dark:text-gray-400 mb-4 text-center">Select up to 10 words that describe this person.</p>
+            <div id="peer-words" class="flex flex-wrap gap-2 justify-center"></div>
+            <div class="text-center mt-4">
+                <button id="peer-submit-btn" class="px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-lg shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                    Submit My Picks
+                </button>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="flex flex-wrap justify-center gap-4 mt-8 w-full max-w-md">
+            <button id="clear-board" class="flex items-center justify-center gap-2 px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-lg shadow-md transition-all">
+                Clear Board
+            </button>
+            <button id="save-image" class="flex items-center justify-center gap-2 px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-lg shadow-md transition-all">
+                Save as Image
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal for Image Preview -->
+    <div id="modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 hidden">
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-[90vw] max-w-lg m-4 relative">
+            <h3 class="text-xl font-bold mb-4" id="modal-title"></h3>
+            <div id="modal-content" class="text-gray-800 dark:text-gray-200 max-h-[70vh] overflow-y-auto"></div>
+            <button id="close-modal" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 text-xl font-bold">&times;</button>
+        </div>
+    </div>
+
+    <script>
+        const state = {
+            pills: [
+                "adaptable", "analytical", "bold", "brave", "calm", "caring", "cheerful", "clever", "collaborative",
+                "confident", "considerate", "creative", "curious", "deliberative", "dependable", "determined", "direct",
+                "empathetic", "energetic", "extroverted", "friendly", "focused", "hardworking", "helpful", "humble",
+                "idealistic", "independent", "intelligent", "introverted", "kind", "knowledgeable", "logical", "loving",
+                "observant", "open-minded", "organized", "patient", "perceptive", "proactive", "reflective", "resilient",
+                "responsible", "resourceful", "spontaneous", "strategic", "thoughtful", "trustworthy", "warm"
+            ]
+        };
+
+        const elements = {
+            wordBank: document.getElementById('word-bank'),
+            dropZones: {
+                known_known: document.querySelector('[data-zone="known_known"] .flex-wrap'),
+                known_unknown: document.querySelector('[data-zone="known_unknown"] .flex-wrap'),
+                unknown_known: document.querySelector('[data-zone="unknown_known"] .flex-wrap'),
+                unknown_unknown: document.querySelector('[data-zone="unknown_unknown"] .flex-wrap')
+            },
+            peerWords: document.getElementById('peer-words'),
+            peerSubmitBtn: document.getElementById('peer-submit-btn'),
+            clearButton: document.getElementById('clear-board'),
+            saveButton: document.getElementById('save-image'),
+            modal: document.getElementById('modal'),
+            modalTitle: document.getElementById('modal-title'),
+            modalContent: document.getElementById('modal-content'),
+            closeModal: document.getElementById('close-modal'),
+            appContainer: document.getElementById('app'),
+            johariWindow: document.getElementById('johari-window')
+        };
+
+        const LOCAL_STORAGE_KEY = 'johariWindowBoardState';
+        const MAX_PEER_PICKS = 10;
+        let peerSelectedPills = new Set();
+        let draggedFromZoneName = null;
+        let draggedWord = null;
+
+        /**
+         * Creates a pill element with optional removal button and count.
+         * @param {string} word The word for the pill.
+         * @param {boolean} isRemovable If true, adds a remove button.
+         * @param {number} count The number of times this pill has been added (for display).
+         * @returns {HTMLElement} The created pill element.
+         */
+        const createPill = (word, isRemovable = false, count = 1) => {
+            const pill = document.createElement('div');
+            pill.className = 'pill relative flex items-center bg-blue-200 dark:bg-blue-700 text-blue-800 dark:text-blue-200 pl-3 pr-2 py-1 rounded-full shadow-sm hover:scale-105 transform';
+            pill.setAttribute('draggable', true);
+            pill.setAttribute('data-word', word);
+
+            const displayText = count > 1 ? `${word} (${count})` : word;
+            const textSpan = document.createElement('span');
+            textSpan.textContent = displayText;
+            textSpan.className = 'mr-1';
+            pill.appendChild(textSpan);
+
+            if (isRemovable) {
+                const removeBtn = document.createElement('button');
+                removeBtn.textContent = '×';
+                removeBtn.className = 'text-xs font-bold text-gray-600 dark:text-gray-200 hover:text-red-500 dark:hover:text-red-400 p-1 -m-1 rounded-full transition-colors';
+                removeBtn.style.lineHeight = '0.5rem';
+
+                removeBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const parentContainer = pill.parentElement;
+                    const wordToRemove = pill.getAttribute('data-word');
+
+                    const newBoardState = loadBoardState();
+                    const zoneName = Object.keys(elements.dropZones).find(key => elements.dropZones[key] === parentContainer);
+                    if (zoneName) {
+                        const wordsInZone = newBoardState[zoneName];
+                        const index = wordsInZone.indexOf(wordToRemove);
+                        if (index !== -1) {
+                            wordsInZone.splice(index, 1);
+                        }
+                    }
+                    saveBoardState(newBoardState);
+                    renderBoardFromState(newBoardState);
+                });
+                pill.appendChild(removeBtn);
+            }
+
+            return pill;
+        };
+
+        const saveBoardState = (boardState) => {
+            try {
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(boardState));
+            } catch (e) {
+                console.error("Error saving to local storage:", e);
+            }
+        };
+
+        const loadBoardState = () => {
+            try {
+                const storedState = localStorage.getItem(LOCAL_STORAGE_KEY);
+                const loadedState = storedState ? JSON.parse(storedState) : {
+                    known_known: [],
+                    known_unknown: [],
+                    unknown_known: []
+                };
+
+                // The unknown_unknown area is always dynamically calculated, so clear any stale data.
+                loadedState.unknown_unknown = [];
+                return loadedState;
+            } catch (e) {
+                console.error("Error loading from local storage:", e);
+                return {
+                    known_known: [],
+                    known_unknown: [],
+                    unknown_known: []
+                };
+            }
+        };
+
+        const renderBoardFromState = (boardState) => {
+            if (!boardState) return;
+
+            const allWordsOnBoard = new Set([
+                ...boardState.known_known,
+                ...boardState.known_unknown,
+                ...boardState.unknown_known
+            ]);
+            const unknownWords = state.pills.filter(word => !allWordsOnBoard.has(word));
+            boardState.unknown_unknown = unknownWords;
+
+            renderPills(state.pills, elements.wordBank);
+            renderPeerPills(state.pills, elements.peerWords);
+
+            for (const zone in elements.dropZones) {
+                const container = elements.dropZones[zone];
+                container.innerHTML = '';
+                const wordsInZone = boardState[zone] || [];
+
+                const wordCounts = wordsInZone.reduce((acc, word) => {
+                    acc[word] = (acc[word] || 0) + 1;
+                    return acc;
+                }, {});
+
+                const uniqueWords = [...new Set(wordsInZone)];
+                uniqueWords.forEach(word => {
+                    const count = wordCounts[word];
+                    const pill = createPill(word, true, count);
+                    container.appendChild(pill);
+                });
+            }
+        };
+
+        /**
+         * Renders pills into a container. Used for the word bank.
+         * @param {string[]} pills Array of pill words.
+         * @param {HTMLElement} container The container to render into.
+         */
+        const renderPills = (pills, container) => {
+            container.innerHTML = '';
+            pills.forEach(word => {
+                container.appendChild(createPill(word, false));
+            });
+        };
+
+        const renderPeerPills = (pills, container) => {
+            container.innerHTML = '';
+            pills.forEach(word => {
+                const pill = document.createElement('div');
+                pill.className = `pill relative flex items-center bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-200 px-3 py-1 rounded-full shadow-sm cursor-pointer transition-all hover:scale-105`;
+                pill.textContent = word;
+                pill.setAttribute('data-word', word);
+                pill.addEventListener('click', () => {
+                    if (peerSelectedPills.has(word)) {
+                        peerSelectedPills.delete(word);
+                        pill.classList.remove('bg-green-300', 'dark:bg-green-700', 'text-green-800', 'dark:text-green-200');
+                        pill.classList.add('bg-gray-200', 'dark:bg-gray-600', 'text-gray-800', 'dark:text-gray-200');
+                    } else if (peerSelectedPills.size < MAX_PEER_PICKS) {
+                        peerSelectedPills.add(word);
+                        pill.classList.remove('bg-gray-200', 'dark:bg-gray-600', 'text-gray-800', 'dark:text-gray-200');
+                        pill.classList.add('bg-green-300', 'dark:bg-green-700', 'text-green-800', 'dark:text-green-200');
+                    }
+                    elements.peerSubmitBtn.disabled = peerSelectedPills.size === 0;
+                });
+                container.appendChild(pill);
+            });
+        };
+
+        const submitPeerPicks = () => {
+            if (peerSelectedPills.size === 0) return;
+
+            const currentBoardState = loadBoardState();
+
+            peerSelectedPills.forEach(peerWord => {
+                const isKnownToSelf = currentBoardState.unknown_known.includes(peerWord) || currentBoardState.known_known.includes(peerWord);
+
+                // If the word is known to the user (in Open or Hidden), it moves/stays in the Open Area.
+                if (isKnownToSelf) {
+                    // First, remove any existing instances from other panes to avoid duplication
+                    currentBoardState.unknown_known = currentBoardState.unknown_known.filter(word => word !== peerWord);
+                    currentBoardState.known_unknown = currentBoardState.known_unknown.filter(word => word !== peerWord);
+                    
+                    // Add the word to the Open Area (this will handle accumulation)
+                    currentBoardState.known_known.push(peerWord);
+                } else {
+                    // If the word is NOT known to the user, it goes to the Blind Spot.
+                    currentBoardState.known_unknown.push(peerWord);
+                }
+            });
+
+            saveBoardState(currentBoardState);
+            renderBoardFromState(currentBoardState);
+
+            peerSelectedPills.clear();
+            elements.peerSubmitBtn.disabled = true;
+            renderPeerPills(state.pills, elements.peerWords);
+
+            showModal("Submission Successful", "Thank you for your input! The board has been updated with your picks.");
+        };
+
+        const showModal = (title, content) => {
+            elements.modalTitle.textContent = title;
+            elements.modalContent.innerHTML = content;
+            elements.modal.classList.remove('hidden');
+        };
+
+        const initApp = () => {
+            const initialBoardState = loadBoardState();
+            renderBoardFromState(initialBoardState);
+
+            document.addEventListener('dragstart', (e) => {
+                const pillElement = e.target.closest('.pill');
+                if (pillElement) {
+                    draggedWord = pillElement.getAttribute('data-word');
+                    const parentContainer = pillElement.parentElement.closest('.drop-zone');
+                    if (parentContainer) {
+                        draggedFromZoneName = parentContainer.getAttribute('data-zone');
+                    } else {
+                        // Dragging from the word bank, which has no data-zone
+                        draggedFromZoneName = 'word_bank';
+                    }
+                    e.dataTransfer.setData('text/plain', draggedWord);
+                    e.dataTransfer.effectAllowed = 'move';
+                    pillElement.classList.add('opacity-50');
+                }
+            });
+
+            document.addEventListener('dragend', (e) => {
+                const pillElement = e.target.closest('.pill');
+                if (pillElement) {
+                    pillElement.classList.remove('opacity-50');
+                }
+                draggedWord = null;
+                draggedFromZoneName = null;
+            });
+
+            document.querySelectorAll('.drop-zone').forEach(zone => {
+                zone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    zone.classList.add('drag-over');
+                });
+                zone.addEventListener('dragleave', () => {
+                    zone.classList.remove('drag-over');
+                });
+                zone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    zone.classList.remove('drag-over');
+                    if (!draggedWord) {
+                        return;
+                    }
+
+                    const targetZoneName = zone.getAttribute('data-zone');
+                    const currentBoardState = loadBoardState();
+
+                    // 1. Cannot drop into the Unknown Area
+                    if (targetZoneName === 'unknown_unknown') {
+                        renderBoardFromState(currentBoardState);
+                        return;
+                    }
+
+                    // Get the word's current location to check for a transition.
+                    const isFromHidden = draggedFromZoneName === 'unknown_known';
+                    const isFromBlind = draggedFromZoneName === 'known_unknown';
+                    const isToHidden = targetZoneName === 'unknown_known';
+                    const isToBlind = targetZoneName === 'known_unknown';
+
+                    // 2. Remove one instance from the source zone.
+                    if (draggedFromZoneName && draggedFromZoneName !== 'word_bank') {
+                        const wordsInSourceZone = currentBoardState[draggedFromZoneName];
+                        const index = wordsInSourceZone.indexOf(draggedWord);
+                        if (index !== -1) {
+                            wordsInSourceZone.splice(index, 1);
+                        }
+                    }
+
+                    // 3. Apply the core Johari logic.
+                    // If a word moves between the Hidden and Blind Spot, it becomes known to both.
+                    const isTransitioningToOpen = (isFromHidden && isToBlind) || (isFromBlind && isToHidden);
+                    if (isTransitioningToOpen) {
+                        currentBoardState.known_known.push(draggedWord);
+                    } else {
+                        // Otherwise, just add the word to the target zone.
+                        currentBoardState[targetZoneName].push(draggedWord);
+                    }
+                    
+                    saveBoardState(currentBoardState);
+                    renderBoardFromState(currentBoardState);
+                });
+            });
+
+            elements.clearButton.addEventListener('click', () => {
+                const emptyBoardState = {
+                    known_known: [],
+                    known_unknown: [],
+                    unknown_known: []
+                };
+                saveBoardState(emptyBoardState);
+                renderBoardFromState(emptyBoardState);
+            });
+
+            elements.saveButton.addEventListener('click', () => {
+                elements.modalTitle.textContent = "Saving...";
+                elements.modalContent.innerHTML = `<p>Please wait while the image is being generated...</p>`;
+                elements.modal.classList.remove('hidden');
+
+                const boardState = loadBoardState();
+                const allWordsOnBoard = new Set([
+                    ...boardState.known_known,
+                    ...boardState.known_unknown,
+                    ...boardState.unknown_known
+                ]);
+                boardState.unknown_unknown = state.pills.filter(word => !allWordsOnBoard.has(word));
+
+                // Temporarily replace the pills with simple text for better canvas rendering
+                for (const zoneName in elements.dropZones) {
+                    const container = elements.dropZones[zoneName];
+                    const wordsInZone = boardState[zoneName] || [];
+                    const wordCounts = wordsInZone.reduce((acc, word) => {
+                        acc[word] = (acc[word] || 0) + 1;
+                        return acc;
+                    }, {});
+
+                    let tempHtml = '';
+                    const uniqueWords = [...new Set(wordsInZone)];
+                    uniqueWords.forEach(word => {
+                        const count = wordCounts[word];
+                        const displayText = count > 1 ? `${word} (${count})` : word;
+                        tempHtml += `<p class="pill-text inline-block bg-blue-200 dark:bg-blue-700 text-blue-800 dark:text-blue-200 px-3 py-1 rounded-full shadow-sm m-1">${displayText}</p>`;
+                    });
+                    container.innerHTML = tempHtml;
+                }
+
+                setTimeout(() => {
+                    html2canvas(elements.johariWindow, {
+                        scrollX: 0,
+                        scrollY: -window.scrollY,
+                        windowWidth: document.documentElement.offsetWidth,
+                        windowHeight: document.documentElement.offsetHeight
+                    }).then(canvas => {
+                        elements.modalTitle.textContent = "Image Preview";
+                        elements.modalContent.innerHTML = '';
+                        const image = new Image();
+                        image.src = canvas.toDataURL('image/png');
+                        image.className = 'w-full h-auto rounded-lg shadow-md';
+                        elements.modalContent.appendChild(image);
+                        const downloadLink = document.createElement('a');
+                        downloadLink.href = image.src;
+                        downloadLink.download = `johari-window-board.png`;
+                        downloadLink.className = 'mt-4 inline-block bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors';
+                        downloadLink.textContent = 'Download PNG';
+                        elements.modalContent.appendChild(downloadLink);
+                        elements.modalContent.appendChild(document.createElement('p')).innerHTML = '<p class="mt-4 text-sm text-gray-500 dark:text-gray-400">Right-click on the image to save it. You can also use your browser\'s "Print to PDF" function to save as a PDF.</p>';
+                    }).catch(err => {
+                        elements.modalTitle.textContent = "Error";
+                        elements.modalContent.innerHTML = `<p class="text-red-500">Failed to capture image. Please try again later.</p>`;
+                        console.error("Error generating canvas:", err);
+                    }).finally(() => {
+                        // Restore original content after capture is complete
+                        renderBoardFromState(boardState);
+                    });
+                }, 100);
+            });
+
+            elements.peerSubmitBtn.addEventListener('click', submitPeerPicks);
+            elements.closeModal.addEventListener('click', () => {
+                elements.modal.classList.add('hidden');
+            });
+            elements.modal.addEventListener('click', (e) => {
+                if (e.target === elements.modal) {
+                    elements.modal.classList.add('hidden');
+                }
+            });
+        };
+
+        window.onload = initApp;
+    </script>
+</body>
+</html>
